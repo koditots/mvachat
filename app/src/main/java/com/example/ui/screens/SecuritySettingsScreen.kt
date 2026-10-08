@@ -39,6 +39,7 @@ fun SecuritySettingsScreen(
     onToggleDarkMode: () -> Unit,
     onToggleBatterySaver: () -> Unit,
     onOpenGoogleSignIn: () -> Unit = {},
+    onSignOutGoogle: () -> Unit = {},
     onOpenUpdater: () -> Unit = {}
 ) {
     LazyColumn(
@@ -112,13 +113,24 @@ fun SecuritySettingsScreen(
                             }
                         }
 
-                        Button(
-                            onClick = onOpenGoogleSignIn,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp).testTag("btn_switch_google_account")
-                        ) {
-                            Text("Switch", fontSize = 11.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = onSignOutGoogle,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp).testTag("btn_sign_out_google")
+                            ) {
+                                Text("Sign Out", fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = onOpenGoogleSignIn,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp).testTag("btn_switch_google_account")
+                            ) {
+                                Text("Switch", fontSize = 11.sp)
+                            }
                         }
                     }
                 }

@@ -180,7 +180,7 @@ fun TopNavBar(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Sign In",
+                                text = if (currentUser.isGoogleAuthenticated) "Verified" else "Sign In",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF3C4043)

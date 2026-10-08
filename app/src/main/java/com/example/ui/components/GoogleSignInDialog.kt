@@ -44,26 +44,27 @@ fun GoogleSignInDialog(
     var step by remember { mutableStateOf(1) } // 1: Google Account Picker, 2: Business Profile & Username Setup
     var subTab by remember { mutableStateOf(0) } // 0: Google Sign In / Sign Up, 1: Switch Account
 
-    // Detected / Available Google Accounts
-    val suggestedAccounts = listOf(
-        Triple("Austcom Design", "austcomdesign@gmail.com", "AD"),
-        Triple("Marcus Vance", "marcus.vance@mva-enterprises.com", "MV"),
-        Triple("David Henderson", "david.h@acme.com", "DH"),
-        Triple("Sarah Lin", "sarah.lin@mva-legal.com", "SL")
-    )
+    // Verified Accounts from Directory & Current Profile
+    val suggestedAccounts = remember(directoryUsers, currentUser) {
+        if (directoryUsers.isNotEmpty()) {
+            directoryUsers.map { Triple(it.name, it.email, it.avatarInitial) }
+        } else {
+            listOf(Triple(currentUser.name, currentUser.email, currentUser.avatarInitial))
+        }
+    }
 
-    var selectedGoogleName by remember { mutableStateOf("Austcom Design") }
-    var selectedGoogleEmail by remember { mutableStateOf("austcomdesign@gmail.com") }
+    var selectedGoogleName by remember { mutableStateOf(currentUser.name) }
+    var selectedGoogleEmail by remember { mutableStateOf(currentUser.email) }
     var customEmailInput by remember { mutableStateOf("") }
     var useCustomEmail by remember { mutableStateOf(false) }
 
     var usernameInput by remember {
-        mutableStateOf(selectedGoogleEmail.substringBefore("@").replace(".", "_"))
+        mutableStateOf(currentUser.username)
     }
-    var fullNameInput by remember { mutableStateOf(selectedGoogleName) }
-    var companyInput by remember { mutableStateOf("Austcom Digital Enterprise") }
-    var titleInput by remember { mutableStateOf("Managing Director") }
-    var selectedAccountType by remember { mutableStateOf(AccountType.BUSINESS) }
+    var fullNameInput by remember { mutableStateOf(currentUser.name) }
+    var companyInput by remember { mutableStateOf(currentUser.company) }
+    var titleInput by remember { mutableStateOf(currentUser.title) }
+    var selectedAccountType by remember { mutableStateOf(currentUser.accountType) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

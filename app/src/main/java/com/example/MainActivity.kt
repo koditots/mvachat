@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: ChatViewModel = viewModel()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            var isSplashActive by remember { mutableStateOf(true) }
+            val showLoginScreen by viewModel.showingLoginScreen.collectAsStateWithLifecycle()
 
             MVABusinessChatTheme(darkTheme = uiState.isDarkMode) {
                 // Main Application Root
@@ -47,14 +49,38 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.background)
                 ) {
                     when {
-                        // 1. Biometric Enclave Lock Overlay
+                        // 0. Initial Enterprise Animated Splash Screen
+                        isSplashActive -> {
+                            SplashScreen(
+                                onSplashFinished = { isSplashActive = false }
+                            )
+                        }
+
+                        // 1. Google Authentication & Welcome Gateway Screen
+                        showLoginScreen || !uiState.isGoogleSignedIn -> {
+                            LoginScreen(
+                                currentUser = uiState.currentUser,
+                                directoryUsers = uiState.directoryUsers,
+                                onSignInSuccess = { name, email, username, accountType, company, title ->
+                                    viewModel.signInWithGoogle(name, email, username, accountType, company, title)
+                                },
+                                onContinueAsCurrent = {
+                                    viewModel.closeLoginScreen()
+                                },
+                                onDismiss = {
+                                    viewModel.closeLoginScreen()
+                                }
+                            )
+                        }
+
+                        // 2. Biometric Enclave Lock Overlay
                         uiState.isAppLocked -> {
                             BiometricLockOverlay(
                                 onUnlockSuccess = { viewModel.unlockApp() }
                             )
                         }
 
-                        // 2. Active E2EE Audio Call Overlay
+                        // 3. Active E2EE Audio Call Overlay
                         uiState.activeCall != null -> {
                             AudioCallScreen(
                                 callSession = uiState.activeCall!!,
@@ -120,7 +146,7 @@ class MainActivity : ComponentActivity() {
                                         onToggleTheme = { viewModel.toggleTheme() },
                                         onLockApp = { viewModel.lockApp() },
                                         onOpenRoleSwitcher = { viewModel.showingRoleSwitcher.value = true },
-                                        onOpenGoogleSignIn = { viewModel.showingGoogleSignInDialog.value = true },
+                                        onOpenGoogleSignIn = { viewModel.openLoginScreen() },
                                         hasUpdate = uiState.appUpdateInfo.hasUpdate && !uiState.appUpdateInfo.isUpdateInstalled,
                                         onOpenUpdater = { viewModel.showingUpdateDialog.value = true }
                                     )
@@ -169,7 +195,7 @@ class MainActivity : ComponentActivity() {
                                                     viewModel.showingProfileDialog.value = true
                                                 },
                                                 onOpenGoogleSignIn = {
-                                                    viewModel.showingGoogleSignInDialog.value = true
+                                                    viewModel.openLoginScreen()
                                                 },
                                                 onOpenUpdater = {
                                                     viewModel.showingUpdateDialog.value = true
@@ -217,7 +243,8 @@ class MainActivity : ComponentActivity() {
                                                 onRunBackupNow = { viewModel.runBackup() },
                                                 onToggleDarkMode = { viewModel.toggleTheme() },
                                                 onToggleBatterySaver = { viewModel.toggleBatterySaver() },
-                                                onOpenGoogleSignIn = { viewModel.showingGoogleSignInDialog.value = true },
+                                                onOpenGoogleSignIn = { viewModel.openLoginScreen() },
+                                                onSignOutGoogle = { viewModel.signOutGoogle() },
                                                 onOpenUpdater = { viewModel.showingUpdateDialog.value = true }
                                             )
                                         }

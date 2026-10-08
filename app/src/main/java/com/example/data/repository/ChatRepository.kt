@@ -1,7 +1,9 @@
 package com.example.data.repository
 
+import android.content.Context
 import com.example.data.crypto.CryptoManager
 import com.example.data.model.*
+import com.example.data.storage.DataStorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,22 +28,26 @@ data class InAppNotification(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-class ChatRepository(private val scope: CoroutineScope) {
+class ChatRepository(
+    private val scope: CoroutineScope,
+    context: Context? = null
+) {
+    private val storage: DataStorageManager? = context?.let { DataStorageManager(it) }
 
-    // Current User Profile (defaults to Admin for full business control)
+    // Current User Profile (defaults to unauthenticated guest until user signs in via Google / Enterprise)
     private val _currentUser = MutableStateFlow(
         User(
             id = "user_me",
-            name = "Marcus Vance (You)",
-            username = "marcus_ciso",
-            title = "Chief Information Security Officer",
-            company = "MVA Global Enterprises",
-            email = "marcus.vance@mva-enterprises.com",
+            name = "Enterprise User",
+            username = "guest",
+            title = "Account Setup Required",
+            company = "MVA Global Enclave",
+            email = "user@enterpriseglobal.com",
             role = UserRole.ADMIN,
             accountType = AccountType.BUSINESS,
-            isGoogleAuthenticated = true,
-            avatarInitial = "MV",
-            avatarBgColor = 0xFFB71C1C,
+            isGoogleAuthenticated = false,
+            avatarInitial = "EU",
+            avatarBgColor = 0xFF1565C0,
             isOnline = true,
             keyFingerprint = "7A4F-88E2-901C-31B7-0E22-FFA9"
         )
@@ -52,8 +58,8 @@ class ChatRepository(private val scope: CoroutineScope) {
     private val _directoryUsers = MutableStateFlow<List<User>>(emptyList())
     val directoryUsers: StateFlow<List<User>> = _directoryUsers.asStateFlow()
 
-    // Google Sign-In state
-    private val _isGoogleSignedIn = MutableStateFlow(true)
+    // Google Sign-In state (starts false on production until user signs in)
+    private val _isGoogleSignedIn = MutableStateFlow(false)
     val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
 
     // Offline / Connectivity State
@@ -124,10 +130,54 @@ class ChatRepository(private val scope: CoroutineScope) {
     val appUpdateInfo: StateFlow<AppUpdateInfo> = _appUpdateInfo.asStateFlow()
 
     init {
-        initializeSampleData()
+        loadPersistedOrInitialData()
         startDisappearingTicker()
         startCallDurationTicker()
         checkInitialUpdateNotification()
+    }
+
+    private fun loadPersistedOrInitialData() {
+        val savedUser = storage?.loadCurrentUser()
+        val isSavedSignedIn = storage?.isGoogleSignedIn() ?: false
+
+        if (savedUser != null && isSavedSignedIn) {
+            _currentUser.value = savedUser
+            _isGoogleSignedIn.value = true
+        } else {
+            // Production initial state: user authenticates via Google / Enterprise
+            _isGoogleSignedIn.value = false
+        }
+
+        val savedChannels = storage?.loadChannels()
+        val savedMessages = storage?.loadMessages()
+        val savedDirectory = storage?.loadDirectoryUsers()
+
+        if (!savedChannels.isNullOrEmpty()) {
+            _channels.value = savedChannels
+            _messages.value = savedMessages ?: emptyMap()
+            _directoryUsers.value = savedDirectory ?: listOf(_currentUser.value)
+        } else {
+            initializeProductionData()
+        }
+
+        if (storage != null) {
+            _isDarkMode.value = storage.loadDarkMode()
+            _isBatterySaver.value = storage.loadBatterySaver()
+            _isBiometricEnabled.value = storage.loadBiometricEnabled()
+            _autoLockTimeoutMinutes.value = storage.loadAutoLockTimeout()
+        }
+    }
+
+    private fun persistChannels() {
+        storage?.saveChannels(_channels.value)
+    }
+
+    private fun persistMessages() {
+        storage?.saveMessages(_messages.value)
+    }
+
+    private fun persistDirectory() {
+        storage?.saveDirectoryUsers(_directoryUsers.value)
     }
 
     private fun checkInitialUpdateNotification() {
@@ -145,7 +195,7 @@ class ChatRepository(private val scope: CoroutineScope) {
         }
     }
 
-    private fun initializeSampleData() {
+    private fun initializeProductionData() {
         val ch1 = Channel(
             id = "chan_exec",
             name = "Executive Board (Confidential)",
@@ -438,6 +488,10 @@ class ChatRepository(private val scope: CoroutineScope) {
                 isCurrent = false
             )
         )
+
+        persistChannels()
+        persistMessages()
+        persistDirectory()
     }
 
     private fun startDisappearingTicker() {
@@ -702,6 +756,8 @@ class ChatRepository(private val scope: CoroutineScope) {
     fun switchUserAccount(user: User) {
         _currentUser.value = user
         _isGoogleSignedIn.value = user.isGoogleAuthenticated
+        storage?.saveCurrentUser(user)
+        storage?.setGoogleSignedIn(user.isGoogleAuthenticated)
         _notificationEvents.tryEmit(
             InAppNotification(
                 title = "Identity Switched",
@@ -752,10 +808,14 @@ class ChatRepository(private val scope: CoroutineScope) {
         _currentUser.value = newUser
         _isGoogleSignedIn.value = true
 
+        storage?.saveCurrentUser(newUser)
+        storage?.setGoogleSignedIn(true)
+
         _directoryUsers.update { currentList ->
             val filtered = currentList.filterNot { it.email.equals(email, ignoreCase = true) || it.username.equals(cleanUsername, ignoreCase = true) }
             listOf(newUser) + filtered
         }
+        persistDirectory()
 
         _notificationEvents.tryEmit(
             InAppNotification(
@@ -768,6 +828,14 @@ class ChatRepository(private val scope: CoroutineScope) {
 
     fun signOutGoogle() {
         _isGoogleSignedIn.value = false
+        storage?.setGoogleSignedIn(false)
+        _notificationEvents.tryEmit(
+            InAppNotification(
+                title = "Signed Out",
+                message = "Your active Google session has been safely closed.",
+                channelId = "system"
+            )
+        )
     }
 
     fun toggleOfflineMode() {
@@ -901,6 +969,8 @@ class ChatRepository(private val scope: CoroutineScope) {
             // Simulate realistic reply from team or client after 2 seconds if not offline
             simulatePeerResponse(channelId, text)
         }
+        persistMessages()
+        persistChannels()
     }
 
     private fun simulatePeerResponse(channelId: String, userText: String) {
@@ -974,6 +1044,8 @@ class ChatRepository(private val scope: CoroutineScope) {
                     channelId = channelId
                 )
             )
+            persistMessages()
+            persistChannels()
         }
     }
 
@@ -1003,12 +1075,14 @@ class ChatRepository(private val scope: CoroutineScope) {
             }
             currentMap + (channelId to list)
         }
+        persistMessages()
     }
 
     fun updateChannelDisappearingTimer(channelId: String, seconds: Long) {
         _channels.update { list ->
             list.map { if (it.id == channelId) it.copy(disappearingSeconds = seconds) else it }
         }
+        persistChannels()
     }
 
     // Audio Call
@@ -1049,10 +1123,12 @@ class ChatRepository(private val scope: CoroutineScope) {
 
     fun toggleBiometricEnabled(enabled: Boolean) {
         _isBiometricEnabled.value = enabled
+        storage?.saveBiometricEnabled(enabled)
     }
 
     fun setAutoLockTimeout(minutes: Int) {
         _autoLockTimeoutMinutes.value = minutes
+        storage?.saveAutoLockTimeout(minutes)
     }
 
     // Linked Devices & Web QR Sync
@@ -1106,10 +1182,12 @@ class ChatRepository(private val scope: CoroutineScope) {
     // Theme & Battery Saver
     fun toggleDarkMode() {
         _isDarkMode.update { !it }
+        storage?.saveDarkMode(_isDarkMode.value)
     }
 
     fun toggleBatterySaver() {
         _isBatterySaver.update { !it }
+        storage?.saveBatterySaver(_isBatterySaver.value)
     }
 
     // GitHub & OTA Updater methods

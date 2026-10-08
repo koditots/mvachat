@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.*
 import com.example.data.repository.ChatRepository
@@ -39,13 +40,13 @@ data class UiState(
     val currentMessages: List<ChatMessage> = emptyList(),
     val linkedDevices: List<LinkedDevice> = emptyList(),
     val webPairingToken: String = "",
-    val isGoogleSignedIn: Boolean = true,
+    val isGoogleSignedIn: Boolean = false,
     val directoryUsers: List<User> = emptyList(),
     val appUpdateInfo: AppUpdateInfo = AppUpdateInfo()
 )
 
-class ChatViewModel : ViewModel() {
-    val repository = ChatRepository(viewModelScope)
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
+    val repository = ChatRepository(viewModelScope, application.applicationContext)
 
     private val _currentTab = MutableStateFlow(AppNavTab.CHATS)
     val currentTab: StateFlow<AppNavTab> = _currentTab.asStateFlow()
@@ -61,6 +62,7 @@ class ChatViewModel : ViewModel() {
     val showingProfileDialog = MutableStateFlow(false)
     val showingAddContactDialog = MutableStateFlow(false)
     val showingGoogleSignInDialog = MutableStateFlow(false)
+    val showingLoginScreen = MutableStateFlow(false)
     val showingUpdateDialog = MutableStateFlow(false)
     val searchFilter = MutableStateFlow("")
     val channelTypeFilter = MutableStateFlow<ChannelType?>(null)
@@ -324,10 +326,20 @@ class ChatViewModel : ViewModel() {
     ) {
         repository.signInWithGoogle(name, email, username, accountType, company, title)
         showingGoogleSignInDialog.value = false
+        showingLoginScreen.value = false
     }
 
     fun signOutGoogle() {
         repository.signOutGoogle()
+        showingLoginScreen.value = true
+    }
+
+    fun openLoginScreen() {
+        showingLoginScreen.value = true
+    }
+
+    fun closeLoginScreen() {
+        showingLoginScreen.value = false
     }
 
     // App Updater

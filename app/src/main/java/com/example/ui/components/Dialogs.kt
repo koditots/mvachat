@@ -358,7 +358,7 @@ fun AttachmentSheet(
     onFileSelected: (FileAttachment) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sampleFiles = listOf(
+    val enterpriseDocuments = listOf(
         FileAttachment(
             fileName = "Master_Services_Agreement_2026.pdf",
             type = AttachmentType.CONTRACT,
@@ -401,7 +401,7 @@ fun AttachmentSheet(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(modifier = Modifier.height(10.dp))
-                sampleFiles.forEach { file ->
+                enterpriseDocuments.forEach { file ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
