@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Chat bubble silhouette (Safe zone centered 54, 54) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32,28 C26.5,28 22,32.5 22,38 L22,66 C22,71.5 26.5,76 32,76 L38,76 L38,84 L48,76 L76,76 C81.5,76 86,71.5 86,66 L86,38 C86,32.5 81.5,28 76,28 Z" />
+    
+    <!-- Security Shield Cutout/Accent in Red -->
+    <path
+        android:fillColor="#B71C1C"
+        android:pathData="M54,34 L68,39 L68,51 C68,60 62,68 54,71 C46,68 40,60 40,51 L40,39 Z" />
+
+    <!-- Padlock icon inside shield (White) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,43 C51.8,43 50,44.8 50,47 L50,49 L48,49 C46.9,49 46,49.9 46,51 L46,61 C46,62.1 46.9,63 48,63 L60,63 C61.1,63 62,62.1 62,61 L62,51 C62,49.9 61.1,49 60,49 L58,49 L58,47 C58,44.8 56.2,43 54,43 Z M54,45 C55.1,45 56,45.9 56,47 L56,49 L52,49 L52,47 C52,45.9 52.9,45 54,45 Z M54,54 C55.1,54 56,54.9 56,56 C56,56.7 55.4,57.3 54.7,57.8 L55.2,60.5 L52.8,60.5 L53.3,57.8 C52.6,57.3 52,56.7 52,56 C52,54.9 52.9,54 54,54 Z" />
+</vector>

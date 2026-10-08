@@ -1,0 +1,6 @@
+{
+  "name": "MVA Business Chat",
+  "description": "Enterprise end-to-end encrypted messaging, group channels, secure file sharing, audio calls, self-destructing messages, and offline sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
