@@ -38,7 +38,10 @@ data class UiState(
     val channels: List<Channel> = emptyList(),
     val currentMessages: List<ChatMessage> = emptyList(),
     val linkedDevices: List<LinkedDevice> = emptyList(),
-    val webPairingToken: String = ""
+    val webPairingToken: String = "",
+    val isGoogleSignedIn: Boolean = true,
+    val directoryUsers: List<User> = emptyList(),
+    val appUpdateInfo: AppUpdateInfo = AppUpdateInfo()
 )
 
 class ChatViewModel : ViewModel() {
@@ -56,6 +59,9 @@ class ChatViewModel : ViewModel() {
     val showingStickerSheet = MutableStateFlow(false)
     val showingPairingScanner = MutableStateFlow(false)
     val showingProfileDialog = MutableStateFlow(false)
+    val showingAddContactDialog = MutableStateFlow(false)
+    val showingGoogleSignInDialog = MutableStateFlow(false)
+    val showingUpdateDialog = MutableStateFlow(false)
     val searchFilter = MutableStateFlow("")
     val channelTypeFilter = MutableStateFlow<ChannelType?>(null)
     val unreadOnlyFilter = MutableStateFlow(false)
@@ -80,7 +86,10 @@ class ChatViewModel : ViewModel() {
         repository.linkedDevices,
         repository.webPairingToken,
         repository.cloudBackup,
-        repository.isBackingUp
+        repository.isBackingUp,
+        repository.isGoogleSignedIn,
+        repository.directoryUsers,
+        repository.appUpdateInfo
     ) { args: Array<Any?> ->
         val user = args[0] as User
         val offline = args[1] as Boolean
@@ -99,6 +108,9 @@ class ChatViewModel : ViewModel() {
         val webToken = args[14] as String
         val backup = args[15] as CloudBackupInfo
         val backingUp = args[16] as Boolean
+        val googleSignedIn = args[17] as Boolean
+        val directory = args[18] as List<User>
+        val updateInfo = args[19] as AppUpdateInfo
 
         val currentMsgs = selChanId?.let { msgsMap[it] }.orEmpty()
 
@@ -120,7 +132,10 @@ class ChatViewModel : ViewModel() {
             channels = chanList,
             currentMessages = currentMsgs,
             linkedDevices = linkedDevs,
-            webPairingToken = webToken
+            webPairingToken = webToken,
+            isGoogleSignedIn = googleSignedIn,
+            directoryUsers = directory,
+            appUpdateInfo = updateInfo
         )
     }.stateIn(
         scope = viewModelScope,
@@ -227,6 +242,7 @@ class ChatViewModel : ViewModel() {
 
     fun updateProfile(
         name: String,
+        username: String = repository.currentUser.value.username,
         title: String,
         company: String,
         email: String,
@@ -237,6 +253,7 @@ class ChatViewModel : ViewModel() {
     ) {
         repository.updateUserProfile(
             name = name,
+            username = username,
             title = title,
             company = company,
             email = email,
@@ -276,5 +293,57 @@ class ChatViewModel : ViewModel() {
 
     fun markAllAsRead() {
         repository.markAllAsRead()
+    }
+
+    fun searchDirectory(query: String): List<User> {
+        return repository.searchDirectory(query)
+    }
+
+    fun addContactAndStartChat(targetUser: User, initialMessage: String = "") {
+        repository.addContactAndStartChat(targetUser, initialMessage)
+        showingAddContactDialog.value = false
+    }
+
+    fun addContactByEmailOrUsername(query: String, initialMessage: String = "", customDisplayName: String = "") {
+        repository.addContactByEmailOrUsername(query, initialMessage, customDisplayName)
+        showingAddContactDialog.value = false
+    }
+
+    fun switchUserAccount(user: User) {
+        repository.switchUserAccount(user)
+        showingGoogleSignInDialog.value = false
+    }
+
+    fun signInWithGoogle(
+        name: String,
+        email: String,
+        username: String,
+        accountType: AccountType,
+        company: String,
+        title: String
+    ) {
+        repository.signInWithGoogle(name, email, username, accountType, company, title)
+        showingGoogleSignInDialog.value = false
+    }
+
+    fun signOutGoogle() {
+        repository.signOutGoogle()
+    }
+
+    // App Updater
+    fun checkForUpdates(manual: Boolean = true) {
+        repository.checkForUpdates(manual)
+    }
+
+    fun downloadAndInstallUpdate() {
+        repository.downloadAndInstallUpdate()
+    }
+
+    fun dismissUpdateBanner() {
+        repository.dismissUpdateBanner()
+    }
+
+    fun toggleAutoCheckUpdates(enabled: Boolean) {
+        repository.toggleAutoCheckUpdates(enabled)
     }
 }

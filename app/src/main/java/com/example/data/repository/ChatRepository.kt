@@ -33,9 +33,13 @@ class ChatRepository(private val scope: CoroutineScope) {
         User(
             id = "user_me",
             name = "Marcus Vance (You)",
+            username = "marcus_ciso",
             title = "Chief Information Security Officer",
             company = "MVA Global Enterprises",
+            email = "marcus.vance@mva-enterprises.com",
             role = UserRole.ADMIN,
+            accountType = AccountType.BUSINESS,
+            isGoogleAuthenticated = true,
             avatarInitial = "MV",
             avatarBgColor = 0xFFB71C1C,
             isOnline = true,
@@ -43,6 +47,14 @@ class ChatRepository(private val scope: CoroutineScope) {
         )
     )
     val currentUser: StateFlow<User> = _currentUser.asStateFlow()
+
+    // Directory of registered users accessible across enterprise & clients
+    private val _directoryUsers = MutableStateFlow<List<User>>(emptyList())
+    val directoryUsers: StateFlow<List<User>> = _directoryUsers.asStateFlow()
+
+    // Google Sign-In state
+    private val _isGoogleSignedIn = MutableStateFlow(true)
+    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
 
     // Offline / Connectivity State
     private val _isOffline = MutableStateFlow(false)
@@ -107,10 +119,30 @@ class ChatRepository(private val scope: CoroutineScope) {
     private val _isBatterySaver = MutableStateFlow(false)
     val isBatterySaver: StateFlow<Boolean> = _isBatterySaver.asStateFlow()
 
+    // In-App GitHub OTA Updater
+    private val _appUpdateInfo = MutableStateFlow(AppUpdateInfo())
+    val appUpdateInfo: StateFlow<AppUpdateInfo> = _appUpdateInfo.asStateFlow()
+
     init {
         initializeSampleData()
         startDisappearingTicker()
         startCallDurationTicker()
+        checkInitialUpdateNotification()
+    }
+
+    private fun checkInitialUpdateNotification() {
+        scope.launch {
+            delay(3000)
+            if (_appUpdateInfo.value.hasUpdate && !_appUpdateInfo.value.isUpdateInstalled) {
+                _notificationEvents.tryEmit(
+                    InAppNotification(
+                        title = "🚀 Update Available: v1.1.0",
+                        message = "New GitHub release available. Tap to download and install new features.",
+                        channelId = "system_update"
+                    )
+                )
+            }
+        }
     }
 
     private fun initializeSampleData() {
@@ -191,6 +223,69 @@ class ChatRepository(private val scope: CoroutineScope) {
         )
 
         _channels.value = listOf(ch1, ch2, ch3, ch4)
+
+        // Seed directory users searchable by email or username
+        val userAustcom = User(
+            id = "user_austcom",
+            name = "Austcom Design",
+            username = "austcom_design",
+            title = "Creative & Engineering Lead",
+            company = "Austcom Digital Enterprise",
+            email = "austcomdesign@gmail.com",
+            role = UserRole.ADMIN,
+            accountType = AccountType.BUSINESS,
+            isGoogleAuthenticated = true,
+            avatarInitial = "AD",
+            avatarBgColor = 0xFFC62828,
+            isOnline = true,
+            keyFingerprint = "9B12-E04F-381A-88D2-441F-AA81"
+        )
+        val userDavid = User(
+            id = "user_acme_lead",
+            name = "David Henderson",
+            username = "david_acme",
+            title = "Procurement VP",
+            company = "Acme Corp",
+            email = "david.h@acme.com",
+            role = UserRole.CLIENT_GUEST,
+            accountType = AccountType.CLIENT_INDIVIDUAL,
+            isGoogleAuthenticated = true,
+            avatarInitial = "DH",
+            avatarBgColor = 0xFF1B5E20,
+            isOnline = true,
+            keyFingerprint = "4F88-129C-99A0-31BB-002E-F190"
+        )
+        val userSarah = User(
+            id = "user_legal",
+            name = "Sarah Lin",
+            username = "sarah_legal",
+            title = "Chief Legal Officer",
+            company = "MVA Global Legal",
+            email = "sarah.lin@mva-legal.com",
+            role = UserRole.MANAGER,
+            accountType = AccountType.BUSINESS,
+            isGoogleAuthenticated = true,
+            avatarInitial = "SL",
+            avatarBgColor = 0xFFD84315,
+            isOnline = true,
+            keyFingerprint = "B229-4820-F09C-11E4-9988-AC10"
+        )
+        val userElena = User(
+            id = "user_dev1",
+            name = "Elena Rostova",
+            username = "elena_eng",
+            title = "Lead Security Architect",
+            company = "MVA Infrastructure",
+            email = "elena.r@mva-infra.org",
+            role = UserRole.MEMBER,
+            accountType = AccountType.BUSINESS,
+            isGoogleAuthenticated = true,
+            avatarInitial = "ER",
+            avatarBgColor = 0xFF0D47A1,
+            isOnline = true,
+            keyFingerprint = "E194-8201-9482-1200-7766-CC34"
+        )
+        _directoryUsers.value = listOf(_currentUser.value, userAustcom, userDavid, userSarah, userElena)
 
         // Seed realistic enterprise messages
         val now = System.currentTimeMillis()
@@ -406,6 +501,7 @@ class ChatRepository(private val scope: CoroutineScope) {
 
     fun updateUserProfile(
         name: String,
+        username: String = _currentUser.value.username,
         title: String,
         company: String,
         email: String,
@@ -421,22 +517,28 @@ class ChatRepository(private val scope: CoroutineScope) {
             .uppercase()
             .ifEmpty { "MV" }
 
+        val cleanUsername = username.removePrefix("@").trim().ifEmpty { _currentUser.value.username }
         val bgColors = listOf(0xFFB71C1C, 0xFFC62828, 0xFF1565C0, 0xFF2E7D32, 0xFF6A1B9A, 0xFFE65100)
         val selectedBg = bgColors.getOrElse(avatarId % bgColors.size) { 0xFFB71C1C }
 
-        _currentUser.update { current ->
-            current.copy(
-                name = name,
-                title = title,
-                company = company,
-                email = email,
-                phone = phone,
-                statusBio = statusBio,
-                avatarInitial = initials,
-                profileAvatarId = avatarId,
-                avatarBgColor = selectedBg,
-                profilePictureUri = profilePictureUri ?: current.profilePictureUri
-            )
+        val updated = _currentUser.value.copy(
+            name = name,
+            username = cleanUsername,
+            title = title,
+            company = company,
+            email = email,
+            phone = phone,
+            statusBio = statusBio,
+            avatarInitial = initials,
+            profileAvatarId = avatarId,
+            avatarBgColor = selectedBg,
+            profilePictureUri = profilePictureUri ?: _currentUser.value.profilePictureUri
+        )
+        _currentUser.value = updated
+
+        // Update in directory
+        _directoryUsers.update { list ->
+            list.map { if (it.id == updated.id) updated else it }
         }
     }
 
@@ -454,6 +556,218 @@ class ChatRepository(private val scope: CoroutineScope) {
         _channels.update { list ->
             list.map { it.copy(unreadCount = 0) }
         }
+    }
+
+    fun searchDirectory(query: String): List<User> {
+        val trimmed = query.trim().removePrefix("@").lowercase()
+        if (trimmed.isEmpty()) return emptyList()
+        return _directoryUsers.value.filter { u ->
+            u.id != _currentUser.value.id && (
+                u.email.lowercase().contains(trimmed) ||
+                u.username.lowercase().contains(trimmed) ||
+                u.name.lowercase().contains(trimmed) ||
+                u.company.lowercase().contains(trimmed)
+            )
+        }
+    }
+
+    fun addContactAndStartChat(targetUser: User, initialMessage: String = ""): Channel {
+        val currentUserId = _currentUser.value.id
+        val existing = _channels.value.find { ch ->
+            ch.type == ChannelType.DIRECT && ch.memberIds.contains(targetUser.id)
+        }
+
+        if (existing != null) {
+            _selectedChannelId.value = existing.id
+            if (initialMessage.isNotBlank()) {
+                sendMessage(existing.id, initialMessage)
+            }
+            return existing
+        }
+
+        val channelId = "chan_direct_" + targetUser.id
+        val newChannel = Channel(
+            id = channelId,
+            name = "${targetUser.name} (@${targetUser.username})",
+            description = "Direct end-to-end encrypted channel with ${targetUser.name} (${targetUser.email})",
+            type = ChannelType.DIRECT,
+            memberIds = listOf(currentUserId, targetUser.id),
+            safetyNumber = CryptoManager.generateSafetyNumber(currentUserId, targetUser.id),
+            disappearingSeconds = 0,
+            requiredMinRoleToSend = UserRole.CLIENT_GUEST,
+            allowClientFiles = true,
+            lastMessageText = if (initialMessage.isNotBlank()) initialMessage else "E2EE secure session established",
+            lastMessageTime = "Just now",
+            unreadCount = 0,
+            avatarInitial = targetUser.avatarInitial,
+            avatarBgColor = targetUser.avatarBgColor,
+            avatarId = targetUser.profileAvatarId,
+            isPeerOnline = targetUser.isOnline
+        )
+
+        _channels.update { listOf(newChannel) + it }
+        _selectedChannelId.value = channelId
+
+        if (initialMessage.isNotBlank()) {
+            sendMessage(channelId, initialMessage)
+        }
+
+        _notificationEvents.tryEmit(
+            InAppNotification(
+                title = "Contact Added",
+                message = "Encrypted conversation with ${targetUser.name} (@${targetUser.username}) initialized.",
+                channelId = channelId
+            )
+        )
+
+        return newChannel
+    }
+
+    fun addContactByEmailOrUsername(
+        query: String,
+        initialMessage: String = "",
+        customDisplayName: String = ""
+    ): Channel {
+        val cleanQuery = query.trim()
+        val cleanUsername = cleanQuery.removePrefix("@").lowercase().replace(" ", "_")
+        val isEmail = cleanQuery.contains("@") && cleanQuery.contains(".")
+
+        // 1. Look up existing in directory by email, username or id
+        val existingUser = _directoryUsers.value.find { u ->
+            u.email.equals(cleanQuery, ignoreCase = true) ||
+            u.username.equals(cleanUsername, ignoreCase = true) ||
+            u.username.equals(cleanQuery.removePrefix("@"), ignoreCase = true) ||
+            u.id.equals("user_$cleanUsername", ignoreCase = true)
+        }
+
+        val targetUser = if (existingUser != null) {
+            existingUser
+        } else {
+            // Provision a new verified user for this email or username
+            val generatedEmail = if (isEmail) cleanQuery else "$cleanUsername@gmail.com"
+            val generatedUsername = if (isEmail) cleanQuery.substringBefore("@").replace(".", "_") else cleanUsername
+            val generatedName = if (customDisplayName.isNotBlank()) {
+                customDisplayName
+            } else if (isEmail) {
+                cleanQuery.substringBefore("@").replace(".", " ")
+                    .split(" ")
+                    .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
+            } else {
+                cleanUsername.replace("_", " ")
+                    .split(" ")
+                    .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
+            }
+
+            val initials = generatedName.split(" ")
+                .mapNotNull { it.firstOrNull()?.toString() }
+                .take(2)
+                .joinToString("")
+                .uppercase()
+                .ifEmpty { "GC" }
+
+            val isBusinessDomain = isEmail && !cleanQuery.endsWith("@gmail.com") && !cleanQuery.endsWith("@yahoo.com") && !cleanQuery.endsWith("@outlook.com")
+            val companyName = if (isBusinessDomain) {
+                cleanQuery.substringAfter("@").substringBefore(".").replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } + " Enterprise"
+            } else {
+                "Client Partner"
+            }
+
+            val newUser = User(
+                id = "user_" + generatedUsername + "_" + UUID.randomUUID().toString().take(4),
+                name = generatedName,
+                username = generatedUsername,
+                title = if (isBusinessDomain) "Corporate Contact" else "Verified Client",
+                company = companyName,
+                email = generatedEmail,
+                role = UserRole.CLIENT_GUEST,
+                accountType = if (isBusinessDomain) AccountType.BUSINESS else AccountType.CLIENT_INDIVIDUAL,
+                isGoogleAuthenticated = true,
+                googleId = "google_" + UUID.randomUUID().toString().take(10),
+                avatarInitial = initials,
+                avatarBgColor = 0xFF2E7D32,
+                isOnline = true,
+                keyFingerprint = CryptoManager.sha256(generatedEmail).take(16).chunked(4).joinToString("-")
+            )
+
+            _directoryUsers.update { current ->
+                val filtered = current.filterNot { it.email.equals(generatedEmail, ignoreCase = true) || it.username.equals(generatedUsername, ignoreCase = true) }
+                filtered + newUser
+            }
+            newUser
+        }
+
+        return addContactAndStartChat(targetUser, initialMessage)
+    }
+
+    fun switchUserAccount(user: User) {
+        _currentUser.value = user
+        _isGoogleSignedIn.value = user.isGoogleAuthenticated
+        _notificationEvents.tryEmit(
+            InAppNotification(
+                title = "Identity Switched",
+                message = "Now active as ${user.name} (@${user.username})",
+                channelId = "system"
+            )
+        )
+    }
+
+    fun signInWithGoogle(
+        name: String,
+        email: String,
+        username: String,
+        accountType: AccountType,
+        company: String,
+        title: String
+    ) {
+        val initials = name.split(" ")
+            .mapNotNull { it.firstOrNull()?.toString() }
+            .take(2)
+            .joinToString("")
+            .uppercase()
+            .ifEmpty { "ME" }
+
+        val cleanUsername = username.removePrefix("@").trim().ifEmpty {
+            email.substringBefore("@").replace(".", "_")
+        }
+
+        val newUser = User(
+            id = "user_" + cleanUsername,
+            name = name,
+            username = cleanUsername,
+            title = title.ifEmpty { if (accountType == AccountType.BUSINESS) "Enterprise Officer" else "Client Lead" },
+            company = company.ifEmpty { if (accountType == AccountType.BUSINESS) "Enterprise Solutions" else "Client Enterprise" },
+            email = email,
+            phone = "+1 (555) 012-3498",
+            statusBio = "🔒 Google Verified Identity • Encrypted Session Active",
+            role = if (accountType == AccountType.BUSINESS) UserRole.ADMIN else UserRole.CLIENT_GUEST,
+            accountType = accountType,
+            isGoogleAuthenticated = true,
+            googleId = "google_" + UUID.randomUUID().toString().take(12),
+            avatarInitial = initials,
+            avatarBgColor = 0xFFB71C1C,
+            isOnline = true,
+            keyFingerprint = CryptoManager.sha256(email).take(16).chunked(4).joinToString("-")
+        )
+
+        _currentUser.value = newUser
+        _isGoogleSignedIn.value = true
+
+        _directoryUsers.update { currentList ->
+            val filtered = currentList.filterNot { it.email.equals(email, ignoreCase = true) || it.username.equals(cleanUsername, ignoreCase = true) }
+            listOf(newUser) + filtered
+        }
+
+        _notificationEvents.tryEmit(
+            InAppNotification(
+                title = "Signed in with Google",
+                message = "Welcome $name (@$cleanUsername). Your corporate enclave is verified.",
+                channelId = "system"
+            )
+        )
+    }
+
+    fun signOutGoogle() {
+        _isGoogleSignedIn.value = false
     }
 
     fun toggleOfflineMode() {
@@ -796,5 +1110,73 @@ class ChatRepository(private val scope: CoroutineScope) {
 
     fun toggleBatterySaver() {
         _isBatterySaver.update { !it }
+    }
+
+    // GitHub & OTA Updater methods
+    fun checkForUpdates(isManual: Boolean = true) {
+        scope.launch {
+            _appUpdateInfo.update { it.copy(isChecking = true) }
+            delay(1400)
+            _appUpdateInfo.update {
+                it.copy(
+                    isChecking = false,
+                    hasUpdate = !it.isUpdateInstalled,
+                    latestVersion = "1.1.0"
+                )
+            }
+            if (_appUpdateInfo.value.hasUpdate && !_appUpdateInfo.value.isUpdateInstalled) {
+                _notificationEvents.tryEmit(
+                    InAppNotification(
+                        title = "GitHub Update: v1.1.0",
+                        message = "New release found with Google Auth & voice calls. Tap to install.",
+                        channelId = "system_update"
+                    )
+                )
+            } else if (isManual) {
+                _notificationEvents.tryEmit(
+                    InAppNotification(
+                        title = "App is Up to Date",
+                        message = "You are running the latest version (${_appUpdateInfo.value.currentVersion}).",
+                        channelId = "system"
+                    )
+                )
+            }
+        }
+    }
+
+    fun downloadAndInstallUpdate() {
+        scope.launch {
+            _appUpdateInfo.update { it.copy(isDownloading = true, downloadProgress = 0.05f) }
+            for (p in 10..100 step 15) {
+                delay(250)
+                _appUpdateInfo.update { it.copy(downloadProgress = p / 100f) }
+            }
+            delay(400)
+            _appUpdateInfo.update {
+                it.copy(
+                    isDownloading = false,
+                    downloadProgress = 1f,
+                    isUpdateInstalled = true,
+                    currentVersion = "1.1.0",
+                    currentVersionCode = 2,
+                    hasUpdate = false
+                )
+            }
+            _notificationEvents.tryEmit(
+                InAppNotification(
+                    title = "✅ Update Installed Successfully",
+                    message = "Welcome to MVA Business Chat v1.1.0! All new enterprise features are active.",
+                    channelId = "system"
+                )
+            )
+        }
+    }
+
+    fun dismissUpdateBanner() {
+        _appUpdateInfo.update { it.copy(hasUpdate = false) }
+    }
+
+    fun toggleAutoCheckUpdates(enabled: Boolean) {
+        _appUpdateInfo.update { it.copy(autoCheckEnabled = enabled) }
     }
 }

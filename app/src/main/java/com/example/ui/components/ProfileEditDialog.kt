@@ -46,6 +46,7 @@ fun ProfileEditDialog(
     currentUser: User,
     onSaveProfile: (
         name: String,
+        username: String,
         title: String,
         company: String,
         email: String,
@@ -57,6 +58,7 @@ fun ProfileEditDialog(
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(currentUser.name) }
+    var username by remember { mutableStateOf(currentUser.username) }
     var title by remember { mutableStateOf(currentUser.title) }
     var company by remember { mutableStateOf(currentUser.company) }
     var email by remember { mutableStateOf(currentUser.email) }
@@ -324,6 +326,7 @@ fun ProfileEditDialog(
                 onClick = {
                     onSaveProfile(
                         name.trim().ifEmpty { currentUser.name },
+                        username.removePrefix("@").trim().ifEmpty { currentUser.username },
                         title.trim().ifEmpty { currentUser.title },
                         company.trim().ifEmpty { currentUser.company },
                         email.trim().ifEmpty { currentUser.email },

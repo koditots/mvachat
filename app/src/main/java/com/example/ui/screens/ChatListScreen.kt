@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AppUpdateInfo
 import com.example.data.model.Channel
 import com.example.data.model.ChannelType
 import com.example.data.model.User
@@ -36,13 +37,18 @@ fun ChatListScreen(
     selectedTypeFilter: ChannelType?,
     searchQuery: String,
     unreadOnlyFilter: Boolean = false,
+    appUpdateInfo: AppUpdateInfo = AppUpdateInfo(),
     onFilterChanged: (ChannelType?) -> Unit,
     onUnreadFilterChanged: (Boolean) -> Unit = {},
     onMarkAllReadClick: () -> Unit = {},
     onSearchChanged: (String) -> Unit,
     onChannelClick: (String) -> Unit,
     onNewChatClick: () -> Unit,
-    onEditProfileClick: () -> Unit
+    onAddContactClick: () -> Unit = onNewChatClick,
+    onEditProfileClick: () -> Unit,
+    onOpenGoogleSignIn: () -> Unit = {},
+    onOpenUpdater: () -> Unit = {},
+    onDismissUpdate: () -> Unit = {}
 ) {
     val totalUnreadCount = remember(channels) { channels.sumOf { it.unreadCount } }
     val unreadConversationsCount = remember(channels) { channels.count { it.unreadCount > 0 } }
@@ -61,12 +67,12 @@ fun ChatListScreen(
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNewChatClick,
+                onClick = onAddContactClick,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("fab_new_chat")
             ) {
-                Icon(Icons.Default.EditNote, contentDescription = "New Encrypted Channel")
+                Icon(Icons.Default.PersonAdd, contentDescription = "Add Contact by Username or Email")
             }
         }
     ) { paddingValues ->
@@ -79,8 +85,91 @@ fun ChatListScreen(
             UserProfileHeaderCard(
                 user = currentUser,
                 unreadTotalCount = totalUnreadCount,
-                onEditProfileClick = onEditProfileClick
+                onEditProfileClick = onEditProfileClick,
+                onAddContactClick = onAddContactClick,
+                onOpenGoogleSignIn = onOpenGoogleSignIn
             )
+
+            // Dynamic In-App GitHub OTA Update Banner
+            AnimatedVisibility(visible = appUpdateInfo.hasUpdate && !appUpdateInfo.isUpdateInstalled) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clickable(onClick = onOpenUpdater)
+                        .testTag("banner_app_update_available"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdate,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Update Available: v${appUpdateInfo.latestVersion}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Surface(
+                                    color = Color(0xFFB71C1C),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "NEW",
+                                        color = Color.White,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "New GitHub release ready. Tap to download & update.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = onOpenUpdater,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Update", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        IconButton(
+                            onClick = onDismissUpdate,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
 
             // Search Bar (Red & White accented)
             OutlinedTextField(
@@ -366,7 +455,9 @@ fun ChatListScreen(
 fun UserProfileHeaderCard(
     user: User,
     unreadTotalCount: Int = 0,
-    onEditProfileClick: () -> Unit
+    onEditProfileClick: () -> Unit,
+    onAddContactClick: () -> Unit = {},
+    onOpenGoogleSignIn: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -445,8 +536,8 @@ fun UserProfileHeaderCard(
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = user.role.displayName,
-                                fontSize = 9.sp,
+                                text = "@${user.username}",
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -454,13 +545,22 @@ fun UserProfileHeaderCard(
                         }
                     }
 
-                    Text(
-                        text = "${user.title} • ${user.company}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Mail,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = user.email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(2.dp))
 
@@ -505,21 +605,60 @@ fun UserProfileHeaderCard(
                 }
             }
 
-            // Right: Edit Profile Action Button
-            IconButton(
-                onClick = onEditProfileClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .testTag("btn_edit_profile")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit Profile",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+            // Right: Add Contact, Edit Profile, and Google Identity Buttons
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onAddContactClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .testTag("btn_header_add_contact")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PersonAdd,
+                        contentDescription = "Add Contact",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                IconButton(
+                    onClick = onOpenGoogleSignIn,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                        .testTag("btn_header_google_account")
+                ) {
+                    Text(
+                        text = "G",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 16.sp,
+                        color = Color(0xFFEA4335)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                IconButton(
+                    onClick = onEditProfileClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .testTag("btn_edit_profile")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Profile",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }

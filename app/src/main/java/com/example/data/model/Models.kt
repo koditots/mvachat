@@ -9,15 +9,24 @@ enum class UserRole(val displayName: String, val badgeColor: Long) {
     CLIENT_GUEST("Verified Client", 0xFF2E7D32)
 }
 
+enum class AccountType(val displayName: String) {
+    BUSINESS("Business / Enterprise"),
+    CLIENT_INDIVIDUAL("Client / Individual")
+}
+
 data class User(
     val id: String,
     val name: String,
+    val username: String = "marcus_ciso",
     val title: String,
     val company: String,
     val email: String = "marcus.vance@mva-enterprises.com",
     val phone: String = "+1 (555) 019-2834",
     val statusBio: String = "🔒 Encrypted via MVA Enclave • Active",
     val role: UserRole,
+    val accountType: AccountType = AccountType.BUSINESS,
+    val isGoogleAuthenticated: Boolean = true,
+    val googleId: String = "google_104829104819",
     val avatarInitial: String,
     val avatarBgColor: Long,
     val profilePictureUri: String? = null,
@@ -143,3 +152,22 @@ data class CloudBackupInfo(
     val isAutoBackupEnabled: Boolean = true,
     val destination: String = "Enterprise Cloud Vault (Frankfurt AZ-1)"
 )
+
+data class AppUpdateInfo(
+    val currentVersion: String = "1.0.0",
+    val latestVersion: String = "1.1.0",
+    val currentVersionCode: Int = 1,
+    val latestVersionCode: Int = 2,
+    val hasUpdate: Boolean = true,
+    val releaseTitle: String = "MVA Business Chat v1.1.0 - Google Auth & E2EE Audio Bridge",
+    val releaseNotes: String = "• Google Identity & Sign-In integration for businesses and clients\n• Find and chat anyone using their Google email or created @username\n• Live audio call bridge with AES-256-GCM hardware encryption\n• Self-destructing message countdown timer\n• Offline message queue auto-sync on reconnect\n• Biometric security enclave authentication",
+    val githubRepoUrl: String = "https://github.com",
+    val downloadUrl: String = "https://github.com/releases/download/v1.1.0/mva-business-chat-v1.1.0.apk",
+    val releaseDate: String = "October 2026",
+    val isChecking: Boolean = false,
+    val isDownloading: Boolean = false,
+    val downloadProgress: Float = 0f,
+    val isUpdateInstalled: Boolean = false,
+    val autoCheckEnabled: Boolean = true
+)
+

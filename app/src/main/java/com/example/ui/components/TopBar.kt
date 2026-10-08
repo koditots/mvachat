@@ -32,7 +32,10 @@ fun TopNavBar(
     onTriggerSync: () -> Unit,
     onToggleTheme: () -> Unit,
     onLockApp: () -> Unit,
-    onOpenRoleSwitcher: () -> Unit
+    onOpenRoleSwitcher: () -> Unit,
+    onOpenGoogleSignIn: () -> Unit = {},
+    hasUpdate: Boolean = false,
+    onOpenUpdater: () -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -156,6 +159,35 @@ fun TopNavBar(
                         }
                     }
 
+                    // Google Identity Button
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = onOpenGoogleSignIn)
+                            .testTag("google_identity_button"),
+                        color = Color.White,
+                        contentColor = Color(0xFFEA4335)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "G",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFEA4335)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Sign In",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF3C4043)
+                            )
+                        }
+                    }
+
                     // Theme Toggle
                     IconButton(
                         onClick = onToggleTheme,
@@ -184,6 +216,34 @@ fun TopNavBar(
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(19.dp)
                         )
+                    }
+
+                    // GitHub OTA Updater Icon button
+                    IconButton(
+                        onClick = onOpenUpdater,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("updater_top_button")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (hasUpdate) {
+                                    Badge(
+                                        containerColor = Color(0xFFFFD600),
+                                        contentColor = Color.Black
+                                    ) {
+                                        Text("!", fontWeight = FontWeight.Black, fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdate,
+                                contentDescription = "Check Updates",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

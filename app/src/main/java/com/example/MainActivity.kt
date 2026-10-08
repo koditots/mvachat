@@ -119,7 +119,10 @@ class MainActivity : ComponentActivity() {
                                         onTriggerSync = { viewModel.triggerSync() },
                                         onToggleTheme = { viewModel.toggleTheme() },
                                         onLockApp = { viewModel.lockApp() },
-                                        onOpenRoleSwitcher = { viewModel.showingRoleSwitcher.value = true }
+                                        onOpenRoleSwitcher = { viewModel.showingRoleSwitcher.value = true },
+                                        onOpenGoogleSignIn = { viewModel.showingGoogleSignInDialog.value = true },
+                                        hasUpdate = uiState.appUpdateInfo.hasUpdate && !uiState.appUpdateInfo.isUpdateInstalled,
+                                        onOpenUpdater = { viewModel.showingUpdateDialog.value = true }
                                     )
                                 },
                                 bottomBar = {
@@ -148,6 +151,7 @@ class MainActivity : ComponentActivity() {
                                                 selectedTypeFilter = typeFilter,
                                                 searchQuery = searchQuery,
                                                 unreadOnlyFilter = unreadOnly,
+                                                appUpdateInfo = uiState.appUpdateInfo,
                                                 onFilterChanged = { viewModel.channelTypeFilter.value = it },
                                                 onUnreadFilterChanged = { viewModel.unreadOnlyFilter.value = it },
                                                 onMarkAllReadClick = { viewModel.markAllAsRead() },
@@ -156,14 +160,22 @@ class MainActivity : ComponentActivity() {
                                                     viewModel.openChannel(channelId)
                                                 },
                                                 onNewChatClick = {
-                                                    // Quick demo: open first available client channel
-                                                    val firstChan = uiState.channels.firstOrNull()
-                                                    if (firstChan != null) {
-                                                        viewModel.openChannel(firstChan.id)
-                                                    }
+                                                    viewModel.showingAddContactDialog.value = true
+                                                },
+                                                onAddContactClick = {
+                                                    viewModel.showingAddContactDialog.value = true
                                                 },
                                                 onEditProfileClick = {
                                                     viewModel.showingProfileDialog.value = true
+                                                },
+                                                onOpenGoogleSignIn = {
+                                                    viewModel.showingGoogleSignInDialog.value = true
+                                                },
+                                                onOpenUpdater = {
+                                                    viewModel.showingUpdateDialog.value = true
+                                                },
+                                                onDismissUpdate = {
+                                                    viewModel.dismissUpdateBanner()
                                                 }
                                             )
                                         }
@@ -198,12 +210,15 @@ class MainActivity : ComponentActivity() {
                                                 isBatterySaver = uiState.isBatterySaver,
                                                 cloudBackup = uiState.cloudBackup,
                                                 isBackingUp = uiState.isBackingUp,
+                                                appUpdateInfo = uiState.appUpdateInfo,
                                                 onToggleBiometric = { viewModel.toggleBiometric(it) },
                                                 onLockAppNow = { viewModel.lockApp() },
                                                 onOpenRoleSwitcher = { viewModel.showingRoleSwitcher.value = true },
                                                 onRunBackupNow = { viewModel.runBackup() },
                                                 onToggleDarkMode = { viewModel.toggleTheme() },
-                                                onToggleBatterySaver = { viewModel.toggleBatterySaver() }
+                                                onToggleBatterySaver = { viewModel.toggleBatterySaver() },
+                                                onOpenGoogleSignIn = { viewModel.showingGoogleSignInDialog.value = true },
+                                                onOpenUpdater = { viewModel.showingUpdateDialog.value = true }
                                             )
                                         }
                                     }
@@ -216,6 +231,16 @@ class MainActivity : ComponentActivity() {
                     PushNotificationBanner(viewModel = viewModel)
 
                     // Modal Dialogs & Sheets
+                    val showUpdateDialog by viewModel.showingUpdateDialog.collectAsStateWithLifecycle()
+                    if (showUpdateDialog) {
+                        AppUpdateDialog(
+                            updateInfo = uiState.appUpdateInfo,
+                            onCheckForUpdates = { viewModel.checkForUpdates(manual = true) },
+                            onDownloadAndInstall = { viewModel.downloadAndInstallUpdate() },
+                            onToggleAutoCheck = { viewModel.toggleAutoCheckUpdates(it) },
+                            onDismiss = { viewModel.showingUpdateDialog.value = false }
+                        )
+                    }
                     val inspectingMsg by viewModel.inspectingCiphertext.collectAsStateWithLifecycle()
                     inspectingMsg?.let { msg ->
                         CiphertextInspectDialog(
@@ -289,10 +314,40 @@ class MainActivity : ComponentActivity() {
                     if (showProfileDialog) {
                         ProfileEditDialog(
                             currentUser = uiState.currentUser,
-                            onSaveProfile = { name, title, company, email, phone, statusBio, avatarId, profilePicUri ->
-                                viewModel.updateProfile(name, title, company, email, phone, statusBio, avatarId, profilePicUri)
+                            onSaveProfile = { name, username, title, company, email, phone, statusBio, avatarId, profilePicUri ->
+                                viewModel.updateProfile(name, username, title, company, email, phone, statusBio, avatarId, profilePicUri)
                             },
                             onDismiss = { viewModel.showingProfileDialog.value = false }
+                        )
+                    }
+
+                    val showGoogleSignIn by viewModel.showingGoogleSignInDialog.collectAsStateWithLifecycle()
+                    if (showGoogleSignIn) {
+                        GoogleSignInDialog(
+                            currentUser = uiState.currentUser,
+                            directoryUsers = uiState.directoryUsers,
+                            onSignInSuccess = { name, email, username, accountType, company, title ->
+                                viewModel.signInWithGoogle(name, email, username, accountType, company, title)
+                            },
+                            onSwitchAccount = { user ->
+                                viewModel.switchUserAccount(user)
+                            },
+                            onDismiss = { viewModel.showingGoogleSignInDialog.value = false }
+                        )
+                    }
+
+                    val showAddContact by viewModel.showingAddContactDialog.collectAsStateWithLifecycle()
+                    if (showAddContact) {
+                        AddContactDialog(
+                            directoryUsers = uiState.directoryUsers,
+                            currentUserId = uiState.currentUser.id,
+                            onAddContactAndStartChat = { targetUser, initialMessage ->
+                                viewModel.addContactAndStartChat(targetUser, initialMessage)
+                            },
+                            onAddContactByQuery = { query, initialMessage, displayName ->
+                                viewModel.addContactByEmailOrUsername(query, initialMessage, displayName)
+                            },
+                            onDismiss = { viewModel.showingAddContactDialog.value = false }
                         )
                     }
                 }
@@ -332,7 +387,11 @@ fun PushNotificationBanner(viewModel: ChatViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        viewModel.openChannel(notif.channelId)
+                        if (notif.channelId == "system_update") {
+                            viewModel.showingUpdateDialog.value = true
+                        } else if (notif.channelId != "system") {
+                            viewModel.openChannel(notif.channelId)
+                        }
                         currentAlert = null
                     }
                     .testTag("push_notification_banner")
@@ -348,7 +407,7 @@ fun PushNotificationBanner(viewModel: ChatViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ChatBubble,
+                            imageVector = if (notif.channelId == "system_update") Icons.Default.SystemUpdate else Icons.Default.ChatBubble,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)

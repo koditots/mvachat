@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.AppUpdateInfo
 import com.example.data.model.CloudBackupInfo
 import com.example.data.model.User
 import com.example.data.model.UserRole
@@ -30,12 +31,15 @@ fun SecuritySettingsScreen(
     isBatterySaver: Boolean,
     cloudBackup: CloudBackupInfo,
     isBackingUp: Boolean,
+    appUpdateInfo: AppUpdateInfo = AppUpdateInfo(),
     onToggleBiometric: (Boolean) -> Unit,
     onLockAppNow: () -> Unit,
     onOpenRoleSwitcher: () -> Unit,
     onRunBackupNow: () -> Unit,
     onToggleDarkMode: () -> Unit,
-    onToggleBatterySaver: () -> Unit
+    onToggleBatterySaver: () -> Unit,
+    onOpenGoogleSignIn: () -> Unit = {},
+    onOpenUpdater: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -43,6 +47,83 @@ fun SecuritySettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Google Identity & Workspace Section
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = Color.White,
+                                shape = CircleShape,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "G",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 20.sp,
+                                        color = Color(0xFFEA4335)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Google Identity",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        color = Color(0xFFE8F0FE),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Verified",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1A73E8),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = currentUser.email,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Username: @${currentUser.username} • ${currentUser.accountType.displayName}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = onOpenGoogleSignIn,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp).testTag("btn_switch_google_account")
+                        ) {
+                            Text("Switch", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
         // Biometric Security Section
         item {
             Card(
@@ -406,6 +487,104 @@ fun SecuritySettingsScreen(
                         checked = isDarkMode,
                         onCheckedChange = { onToggleDarkMode() },
                         modifier = Modifier.testTag("switch_dark_mode")
+                    )
+                }
+            }
+        }
+
+        // App Version & GitHub OTA Updater Card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(if (appUpdateInfo.hasUpdate) MaterialTheme.colorScheme.primaryContainer else Color(0xFFE8F5E9)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = if (appUpdateInfo.hasUpdate) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Software Updates",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    if (appUpdateInfo.hasUpdate) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "NEW",
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = if (appUpdateInfo.hasUpdate) "Update available: v${appUpdateInfo.latestVersion}"
+                                    else "Installed: v${appUpdateInfo.currentVersion} (Up to date)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = onOpenUpdater,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (appUpdateInfo.hasUpdate) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.secondaryContainer
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("btn_settings_open_updater")
+                        ) {
+                            Icon(
+                                imageVector = if (appUpdateInfo.hasUpdate) Icons.Default.Download else Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (appUpdateInfo.hasUpdate) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (appUpdateInfo.hasUpdate) "Update" else "Check",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (appUpdateInfo.hasUpdate) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Continuous GitHub releases delivery pipeline. Pushing new commits to GitHub automatically triggers update checks.",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 14.sp
                     )
                 }
             }
